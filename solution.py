@@ -1,12 +1,6 @@
 import argparse
 from itertools import product
 
-plaintextName       = "bis.txt"
-ciphertextName      = "bis.txt.enc"
-hintName            = "hint.gif.enc"
-supercipherName     = "super_cipher.py.enc"
-supercipherNameDec  = "super_cipher.py"
-
 '''
     From super_cipher.py we know how key stream is generated in step function
 '''
@@ -16,12 +10,12 @@ N = 8 * N_B
 SUB = [0, 1, 1, 0, 1, 0, 1, 0]
 
 def step(x, SUB):
-    '''
+    """
     Modified step function from partly decipher script file
     :param x:
     :param SUB:
     :return:
-    '''
+    """
     x = (x & 1) << N+1 | x << 1 | x >> N-1
     y = 0
     for i in range(N):
@@ -29,15 +23,26 @@ def step(x, SUB):
     return y
 
 
+"""---------------------Solution------------------------------------"""
+# File names
+plaintextName       = "bis.txt"
+ciphertextName      = "bis.txt.enc"
+hintName            = "hint.gif.enc"
+supercipherName     = "super_cipher.py.enc"
+supercipherNameDec  = "super_cipher.py"
+
+# Mapping tables
+mapping_sub = {0: [0, 3, 5, 7], 1: [1, 2, 4, 6]}
+mapping_val0 = {0: [0], 1: [5], 2: [], 3: [3, 7]}
+mapping_val1 = {0: [4], 1: [1], 2: [2, 6], 3: []}
+
+
 def reverse_step(y):
-    '''
+    """
+    Inverse function to step()
     :param y:   keystream
     :return:    step^-1(y)
-    '''
-    # mapping tables
-    mapping_sub = {0: [0, 3, 5, 7], 1: [1, 2, 4, 6]}
-    mapping_val0 = {0: [0], 1: [5], 2: [], 3: [3, 7]}
-    mapping_val1 = {0: [4], 1: [1], 2: [2, 6], 3: []}
+    """
 
     # init values according to last bit
     values = mapping_sub[y & 1]
@@ -68,11 +73,11 @@ def reverse_step(y):
 
 
 def getPartOfscript(args):
-    '''
+    """
     Try to decipher super_cipher.py file to get more info
     :param args: arguments
     :return:
-    '''
+    """
 
     # open files and read their content
     with open(args.path + "/" + plaintextName, "rb") as file:
@@ -102,14 +107,14 @@ def getPartOfscript(args):
 
 
 def decrypt(script_file, dec_file, SUB, keystr_step):
-    '''
+    """
     Writes decrypted N_B bytes to destination file
     :param script_file:     source file
     :param dec_file:        destination file
     :param SUB:             SUB vector
     :param keystr_step:     key stream step
     :return:
-    '''
+    """
     # read from script file again
     script_bytes = script_file.read(N_B)
 
@@ -129,29 +134,29 @@ def decrypt(script_file, dec_file, SUB, keystr_step):
 
 
 def getWholescript(args):
-    '''
+    """
     Function decrypts whole script file with bruteforcing SUB vector
     :param args:
     :return:
-    '''
+    """
     # open files
     plain_file = open(args.path+"/"+plaintextName, "rb")
     cipher_file = open(args.path +"/" + ciphertextName, "rb")
     script_file = open(args.path + "/" + supercipherName, "rb")
     dec_file = open(args.path + "/" + supercipherNameDec, "wb")
 
-    # read first byte from plaintext and ciphertext
+    # read first N_B bytes from plaintext and ciphertext
     plain_bytes = plain_file.read(N_B)
     cipher_bytes = cipher_file.read(N_B)
 
-    # create first byte key stream
-    keystr_first_byte =  [a ^ b for a, b in zip(plain_bytes, cipher_bytes)]
+    # create first bytes of key stream
+    keystr_first_bytes = [a ^ b for a, b in zip(plain_bytes, cipher_bytes)]
 
-    # read first byte of script file
+    # read first bytes of script file
     script_bytes = script_file.read(N_B)
 
-    # decode first byte according to first key stream
-    dec_byte = [a ^ b for a, b in zip(script_bytes, keystr_first_byte)]
+    # decode first bytes according to first key stream
+    dec_byte = [a ^ b for a, b in zip(script_bytes, keystr_first_bytes)]
     dec_file.write(bytes(dec_byte))
 
     # read next bytes
@@ -168,7 +173,7 @@ def getWholescript(args):
 
     # try all combinations of SUB vector to obtain the same decrypted bytes as xor of plaintext and cypher text
     for SUB in SUBS:
-        keystr_step = step(int.from_bytes(keystr_first_byte, 'little'), SUB).to_bytes(N_B, 'little')
+        keystr_step = step(int.from_bytes(keystr_first_bytes, 'little'), SUB).to_bytes(N_B, 'little')
         dec_byte_step = [a ^ b for a, b in zip(script_bytes, keystr_step)]
 
         if dec_byte == dec_byte_step:
@@ -180,6 +185,8 @@ def getWholescript(args):
     # decrypt whole file
     decrypt(script_file, dec_file, SUB, keystr_step)
 
+    print("SUB: " + str(SUB))
+
     plain_file.close()
     cipher_file.close()
     dec_file.close()
@@ -189,12 +196,12 @@ def getWholescript(args):
 
 
 def getGif(args, SUB):
-    '''
+    """
     Decrypt gif file using same algorithm
     :param args:
     :param SUB:
     :return:
-    '''
+    """
     # open gif file and create decrypt file
     gif_file = open(args.path + "/" + hintName, "rb")
     dec_file = open(args.path + "/" + hintName[:-4], "wb")
@@ -222,6 +229,11 @@ def getGif(args, SUB):
 
 
 def getKey(args):
+    """
+    Function prints original key of stream cipher
+    :param args:    arguments given to script
+    :return:
+    """
     # get first N_B bytes of key stream
     with open(args.path + "/" + plaintextName, "rb") as file:
         plain_bytes = file.read(N_B)
@@ -230,7 +242,6 @@ def getKey(args):
         cipher_bytes = file.read(N_B)
 
     key_stream = int.from_bytes(plain_bytes, 'little') ^ int.from_bytes(cipher_bytes, 'little')
-
 
     for i in range(N//2):
         key_stream = reverse_step(key_stream)
@@ -246,7 +257,6 @@ def main():
     parser.add_argument("path", type=str,
                         help="path to dictionary with secret files")
     args = parser.parse_args()
-
     getKey(args)
     pass
 
